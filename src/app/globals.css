@@ -1,26 +1,27 @@
 @import "tailwindcss";
 
+@theme {
+  /* Configurando as cores da Teoria das Cores para 2026 */
+  --color-orange-500: #FF4D00;
+  --color-orange-600: #E64500;
+  --color-slate-900: #0F172A;
+  
+  --radius-3xl: 1.5rem;
+  --radius-4xl: 2rem;
+  --radius-5xl: 2.5rem;
+}
+
+/* Garante que o Tailwind procure classes em todo o projeto */
+@source "../**/*.{js,ts,jsx,tsx,mdx}";
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --foreground-rgb: 15, 23, 42;
+  --background-rgb: 248, 250, 252;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-rgb));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
