@@ -3,14 +3,18 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { ShoppingBag, Heart, MessageCircle, X } from 'lucide-react';
+// IMPORTAÇÃO DA AUTENTICAÇÃO
+import { useAuth } from '@/contexts/AuthContext'; 
 
 export default function DealCard({ deal, viewMode = 'grid' }: { deal: any, viewMode?: 'grid' | 'list' }) {
+  const { user, signInWithGoogle } = useAuth(); // PUXA OS DADOS REAIS DO GOOGLE
+  const isUserLoggedIn = !!user;
+
   const [imgError, setImgError] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
 
-  const isUserLoggedIn = false; 
-  const isList = viewMode === 'list'; // Variável de controle de layout
+  const isList = viewMode === 'list';
 
   const precoFormatado = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deal.preco || 0);
   const precoAntigoFormatado = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deal.precoAntigo || 0);
@@ -29,49 +33,31 @@ export default function DealCard({ deal, viewMode = 'grid' }: { deal: any, viewM
       setShowLoginModal(true);
       return;
     }
-    setIsFavorite(!isFavorite);
+    // No futuro, isso salvará no Firebase
+    setIsFavorite(!isFavorite); 
+  };
+
+  const handleLoginNoModal = async () => {
+    await signInWithGoogle();
+    setShowLoginModal(false); // Fecha o modal assim que o Google retornar sucesso
   };
 
   return (
     <>
-      {/* A MÁGICA DO LAYOUT ESCALÁVEL:
-        Se for 'list', no mobile continua coluna, mas a partir do tablet (sm) vira linha (flex-row).
-      */}
       <div className={`group bg-white rounded-[1.5rem] flex ${isList ? 'flex-col sm:flex-row' : 'flex-col'} h-full overflow-hidden border border-slate-100 hover:shadow-xl hover:border-orange-100 transition-all duration-300 relative`}>
-        
-        {/* Container da Imagem */}
-        <Link 
-          href={linkDestino} 
-          className={`relative overflow-hidden bg-slate-50 flex items-center justify-center flex-shrink-0 ${isList ? 'aspect-video sm:aspect-square sm:w-56 sm:border-r border-slate-100' : 'aspect-square'}`}
-        >
-          <img 
-            src={imagemFinal} 
-            alt={deal.titulo || "Oferta"} 
-            onError={() => setImgError(true)}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
+        <Link href={linkDestino} className={`relative overflow-hidden bg-slate-50 flex items-center justify-center flex-shrink-0 ${isList ? 'aspect-video sm:aspect-square sm:w-56 sm:border-r border-slate-100' : 'aspect-square'}`}>
+          <img src={imagemFinal} alt={deal.titulo || "Oferta"} onError={() => setImgError(true)} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
         </Link>
 
-        {/* Informações */}
         <div className={`flex flex-col flex-grow ${isList ? 'p-6' : 'p-4'}`}>
           <Link href={linkDestino} className="block mb-3">
-            <span className="text-[10px] font-black text-orange-500 uppercase tracking-wider mb-1 block">
-              {deal.loja || "Loja Parceira"}
-            </span>
-            <h3 className={`font-bold text-slate-800 leading-snug line-clamp-2 group-hover:text-orange-500 transition-colors ${isList ? 'text-base sm:text-lg mb-2' : 'text-sm min-h-[2.5rem]'}`}>
-              {deal.titulo || "Produto sem título"}
-            </h3>
+            <span className="text-[10px] font-black text-orange-500 uppercase tracking-wider mb-1 block">{deal.loja || "Loja Parceira"}</span>
+            <h3 className={`font-bold text-slate-800 leading-snug line-clamp-2 group-hover:text-orange-500 transition-colors ${isList ? 'text-base sm:text-lg mb-2' : 'text-sm min-h-[2.5rem]'}`}>{deal.titulo || "Produto sem título"}</h3>
           </Link>
           
           <div className="mt-auto">
-            {deal.precoAntigo > deal.preco && (
-              <span className="text-xs text-slate-400 line-through mb-0.5 block">
-                {precoAntigoFormatado}
-              </span>
-            )}
-            <span className={`font-black text-slate-900 tracking-tighter block mb-4 ${isList ? 'text-3xl sm:text-4xl' : 'text-2xl'}`}>
-              {precoFormatado}
-            </span>
+            {deal.precoAntigo > deal.preco && <span className="text-xs text-slate-400 line-through mb-0.5 block">{precoAntigoFormatado}</span>}
+            <span className={`font-black text-slate-900 tracking-tighter block mb-4 ${isList ? 'text-3xl sm:text-4xl' : 'text-2xl'}`}>{precoFormatado}</span>
           </div>
 
           <div className="flex items-center justify-between pt-3 border-t border-slate-50">
@@ -107,8 +93,18 @@ export default function DealCard({ deal, viewMode = 'grid' }: { deal: any, viewM
               <h2 className="text-2xl font-black text-slate-900 mb-2">Quase lá!</h2>
               <p className="text-sm text-slate-500 font-medium">Faça login rapidinho para salvar as melhores pechinchas.</p>
             </div>
-            <button onClick={() => alert("Em breve!")} className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl hover:bg-slate-800 transition-colors mb-3">Entrar com Google</button>
-            <button onClick={() => setShowLoginModal(false)} className="w-full bg-slate-50 text-slate-600 font-bold py-4 rounded-2xl hover:bg-slate-100 transition-colors">Agora não</button>
+            
+            {/* BOTÃO REAL DE LOGIN DO GOOGLE */}
+            <button 
+              onClick={handleLoginNoModal} 
+              className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl hover:bg-slate-800 transition-colors mb-3 flex items-center justify-center gap-2"
+            >
+              <UserCircle size={20} /> Entrar com Google
+            </button>
+            
+            <button onClick={() => setShowLoginModal(false)} className="w-full bg-slate-50 text-slate-600 font-bold py-4 rounded-2xl hover:bg-slate-100 transition-colors">
+              Agora não
+            </button>
           </div>
         </div>
       )}
