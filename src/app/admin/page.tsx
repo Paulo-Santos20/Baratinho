@@ -7,7 +7,7 @@ import { LayoutGrid, Plus, Image as ImageIcon, Link as LinkIcon, ShoppingBag, Se
 export default function AdminPage() {
     const [form, setForm] = useState({ titulo: '', preco: '', precoAntigo: '', loja: '', urlAfiliado: '', cupom: '', imagemUrl: '' });
     const [loading, setLoading] = useState(false);
-    // Dentro do componente AdminPage...
+    
     const handleAutoImport = async (url: string) => {
         if (!url.startsWith('http')) return;
         setLoading(true);
@@ -26,7 +26,7 @@ export default function AdminPage() {
                     imagemUrl: data.imagemUrl || '',
                     preco: data.preco || '',
                     loja: data.loja || '',
-                    urlAfiliado: url // Link original para você transformar em afiliado
+                    urlAfiliado: url 
                 });
             }
         } catch (err) {
@@ -36,16 +36,7 @@ export default function AdminPage() {
         }
     };
 
-    // No campo de Link de Afiliado, adicione o trigger:
-    <Input
-        label="Colar Link da Loja"
-        placeholder="https://www.amazon.com.br/produto..."
-        onChange={(v) => {
-            setForm({ ...form, urlAfiliado: v });
-            if (v.length > 20) handleAutoImport(v); // Dispara a mágica automaticamente
-        }}
-    />
-    const saveDeal = async (e: any) => {
+    const saveDeal = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         try {
@@ -57,7 +48,9 @@ export default function AdminPage() {
             });
             alert("Sucesso!");
             setForm({ titulo: '', preco: '', precoAntigo: '', loja: '', urlAfiliado: '', cupom: '', imagemUrl: '' });
-        } catch (err) { alert("Erro!"); }
+        } catch (err) { 
+            alert("Erro!"); 
+        }
         setLoading(false);
     };
 
@@ -88,7 +81,7 @@ export default function AdminPage() {
 
                     <form onSubmit={saveDeal} className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* O Input da "Mágica" com a tipagem corrigida */}
+                            
                             <Input
                                 label="Colar Link da Loja"
                                 placeholder="https://www.amazon.com.br/produto..."
