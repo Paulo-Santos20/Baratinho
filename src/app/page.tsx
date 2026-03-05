@@ -2,9 +2,9 @@
 import React, { useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
-import { 
-  Flame, Clock, TrendingUp, Bell, Ticket, Grid, 
-  User, Search, Heart, Share2, MessageCircle 
+import {
+  Flame, Clock, TrendingUp, Bell, Ticket, Grid,
+  User, Search, Heart, Share2, MessageCircle
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import DealCard from '@/components/DealCard';
@@ -53,10 +53,10 @@ export default function BaratinhoHome() {
           <div className="flex-grow">
             {/* FILTROS RÁPIDOS */}
             <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar mb-6">
-              <FilterBtn icon={<Flame size={16}/>} label="Destaques" active />
-              <FilterBtn icon={<Clock size={16}/>} label="Recentes" />
-              <FilterBtn icon={<TrendingUp size={16}/>} label="Em Alta" />
-              <FilterBtn icon={<Bell size={16}/>} label="Meus Alertas" />
+              <FilterBtn icon={<Flame size={16} />} label="Destaques" active />
+              <FilterBtn icon={<Clock size={16} />} label="Recentes" />
+              <FilterBtn icon={<TrendingUp size={16} />} label="Em Alta" />
+              <FilterBtn icon={<Bell size={16} />} label="Meus Alertas" />
             </div>
 
             {loading ? (
@@ -64,8 +64,10 @@ export default function BaratinhoHome() {
                 {[1, 2, 3, 4, 5, 6].map(n => <div key={n} className="h-96 bg-gray-200 animate-pulse rounded-[2rem]" />)}
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                {deals.map((deal: any) => <DealCard key={deal.id} deal={deal} />)}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                {deals.map((deal: any) => (
+                  <DealCard key={deal.id} deal={deal} />
+                ))}
               </div>
             )}
           </div>
@@ -116,9 +118,8 @@ export default function BaratinhoHome() {
 
 function FilterBtn({ icon, label, active = false }: any) {
   return (
-    <button className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-bold text-sm whitespace-nowrap transition-all ${
-      active ? 'bg-orange-500 text-white shadow-lg shadow-orange-200' : 'bg-white text-slate-500 hover:bg-orange-50'
-    }`}>
+    <button className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-bold text-sm whitespace-nowrap transition-all ${active ? 'bg-orange-500 text-white shadow-lg shadow-orange-200' : 'bg-white text-slate-500 hover:bg-orange-50'
+      }`}>
       {icon} {label}
     </button>
   );
