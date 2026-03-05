@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+// Importar o nosso Provider
+import { AuthProvider } from "@/contexts/AuthContext"; 
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Baratinho | Melhores Ofertas",
-  description: "As melhores pechinchas e cupons da internet.",
+  description: "As melhores pechinchas e cupões da internet.",
 };
 
 export default function RootLayout({
@@ -15,13 +17,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-PT">
       <head>
-        {/* TAG DE VERIFICAÇÃO DA LOMADEE */}
         <meta name="lomadee" content="2324685" />
       </head>
       <body className={inter.className}>
-        {children}
+        {/* Envolvemos o children com o AuthProvider */}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );
