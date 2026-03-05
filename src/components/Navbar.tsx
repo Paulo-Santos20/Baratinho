@@ -1,28 +1,43 @@
-import { Tag, Search, Menu } from 'lucide-react';
+import React from 'react';
+import Link from 'next/link';
+import Searchbar from './Searchbar';
+import { Menu, UserCircle } from 'lucide-react';
 
 export default function Navbar() {
   return (
-    <nav className="fixed top-0 w-full z-50 bg-yellow-400 border-b border-yellow-500/20 backdrop-blur-md">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="bg-slate-900 p-1.5 rounded-xl shadow-lg">
-            <Tag className="text-yellow-400" size={22} />
-          </div>
-          <span className="text-xl font-black tracking-tighter text-slate-900">BARATINHO</span>
-        </div>
+    <header className="bg-white/80 backdrop-blur-md border-b border-slate-100 fixed top-0 inset-x-0 z-40">
+      <div className="container mx-auto px-4 h-20 flex items-center justify-between gap-4 md:gap-8">
         
-        <div className="flex items-center gap-4">
-          <button className="p-2 hover:bg-yellow-500 rounded-full transition-colors">
-            <Search size={20} className="text-slate-900" />
+        {/* LOGO */}
+        <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+          <div className="bg-orange-500 text-white p-2 rounded-xl">
+            {/* Você pode trocar por um ícone de sua preferência ou SVG */}
+            <span className="font-black text-xl leading-none">B</span>
+          </div>
+          <span className="font-black text-2xl tracking-tighter text-slate-900 hidden sm:block">
+            Baratinho<span className="text-orange-500">.</span>
+          </span>
+        </Link>
+
+        {/* BARRA DE BUSCA (Centro) */}
+        <div className="flex-1 max-w-2xl flex justify-center">
+           <Searchbar />
+        </div>
+
+        {/* MENU DIREITO */}
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {/* Botão de busca mobile (apenas em telas muito pequenas) */}
+          <button className="md:hidden p-2 text-slate-500 hover:text-orange-500 transition-colors">
+            <Menu size={24} strokeWidth={2.5} />
           </button>
-          <button className="md:hidden p-2 hover:bg-yellow-500 rounded-full transition-colors">
-            <Menu size={20} className="text-slate-900" />
-          </button>
-          <button className="hidden md:block bg-slate-900 text-white text-xs font-bold px-5 py-2.5 rounded-full hover:bg-slate-800 transition-all active:scale-95 shadow-md">
-            BAIXAR APP
+
+          <button className="hidden sm:flex items-center gap-2 font-bold text-slate-600 hover:text-orange-500 transition-colors">
+            <UserCircle size={24} strokeWidth={2.5} />
+            <span>Entrar</span>
           </button>
         </div>
+
       </div>
-    </nav>
+    </header>
   );
 }
