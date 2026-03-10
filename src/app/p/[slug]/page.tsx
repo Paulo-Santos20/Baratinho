@@ -3,8 +3,11 @@ import Link from 'next/link';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import Navbar from '@/components/Navbar';
-import CommentBox from '@/components/CommentBox'; // IMPORTAÇÃO DA NOSSA CAIXA DE COMENTÁRIOS
-import { ChevronRight, ShoppingBag, Heart, Share2, TrendingDown, ShieldCheck, AlertCircle, MessageCircle, Star } from 'lucide-react';
+import CommentBox from '@/components/CommentBox';
+import ProductActions from '@/components/ProductActions';
+import DealCard from '@/components/DealCard'; 
+import CouponCopy from '@/components/CouponCopy';
+import { ChevronRight, ShoppingBag, TrendingDown, AlertCircle, MessageCircle, Star, Info, Tag, Truck, ShieldCheck, FileText } from 'lucide-react';
 
 export default async function ProductPage({
   params,
@@ -35,6 +38,20 @@ export default async function ProductPage({
 
   const deal = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as any;
 
+  const qRelacionados = query(collection(db, "ofertas"), where("categoria", "==", deal.categoria || 'Tecnologia'), limit(5));
+  const snapRelacionados = await getDocs(qRelacionados);
+  const produtosRelacionados = snapRelacionados.docs
+    .map(doc => {
+      const data = doc.data();
+      return { 
+        id: doc.id, 
+        ...data,
+        dataCriacao: data.dataCriacao?.toMillis ? data.dataCriacao.toMillis() : Date.now()
+      };
+    })
+    .filter(d => d.id !== deal.id)
+    .slice(0, 4);
+
   const preco = deal.preco || 0;
   const precoAntigo = deal.precoAntigo || 0;
   const temDesconto = precoAntigo > preco;
@@ -42,6 +59,7 @@ export default async function ProductPage({
   const porcentagemDesconto = temDesconto ? Math.round((valorEconomia / precoAntigo) * 100) : 0;
 
   const formatarMoeda = (valor: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
+  const precoFormatadoCompleto = formatarMoeda(preco);
 
   const historicoPrecos = [
     { mes: 'Nov', valor: preco * 1.3, atual: false },
@@ -57,113 +75,170 @@ export default async function ProductPage({
       <Navbar />
 
       <main className="container mx-auto px-4 pt-28 pb-24 md:pb-12">
+        
         <nav className="flex items-center gap-2 text-sm font-medium text-slate-400 mb-6 overflow-x-auto whitespace-nowrap pb-2">
           <Link href="/" className="hover:text-orange-500 transition-colors">Home</Link>
           <ChevronRight size={14} />
-          <Link href={`/busca?q=${deal.categoria || 'Tecnologia'}`} className="hover:text-orange-500 transition-colors">
-            {deal.categoria || 'Tecnologia'}
+          <Link href={`/busca?q=${deal.loja || 'Ofertas'}`} className="hover:text-orange-500 transition-colors">
+            {deal.loja || 'Loja Parceira'}
           </Link>
           <ChevronRight size={14} />
           <span className="text-slate-600 truncate max-w-[200px] md:max-w-md">{deal.titulo}</span>
         </nav>
 
-        <div className="flex flex-col lg:flex-row gap-8 xl:gap-12">
-          <div className="flex-1 min-w-0">
-            
-            <div className="bg-white rounded-[2.5rem] p-4 border border-slate-100 shadow-sm mb-8 flex flex-col md:flex-row gap-4">
-              <div className="flex md:flex-col gap-3 order-2 md:order-1 overflow-x-auto md:overflow-visible">
-                {[1, 2, 3].map((item) => (
-                  <div key={item} className={`w-16 h-16 md:w-20 md:h-20 rounded-2xl border-2 flex-shrink-0 flex items-center justify-center p-2 cursor-pointer transition-all ${item === 1 ? 'border-orange-500 bg-orange-50' : 'border-slate-100 bg-slate-50 hover:border-orange-200'}`}>
-                    <img src={deal.imagemUrl || "https://placehold.co/400x400"} alt="Miniatura" className="w-full h-full object-contain mix-blend-multiply" />
-                  </div>
-                ))}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
+          
+          <div className="lg:col-span-7 flex flex-col gap-8">
+            {/* Bloco 1: Produto Principal */}
+            <div className="bg-white rounded-[2.5rem] p-6 md:p-8 border border-slate-100 shadow-sm flex flex-col">
+              <div className="flex items-center justify-between mb-6">
+                <span className="bg-orange-100 text-orange-600 font-black text-xs uppercase tracking-widest px-3 py-1.5 rounded-lg">
+                  {deal.loja || "Loja Parceira"}
+                </span>
+                <div className="flex items-center gap-1 bg-amber-50 text-amber-600 px-3 py-1.5 rounded-lg">
+                  <Star size={14} className="fill-amber-500" />
+                  <span className="text-sm font-bold">Oferta Quente</span>
+                </div>
               </div>
-              <div className="flex-1 bg-slate-50 rounded-[2rem] aspect-square md:aspect-auto md:h-[500px] flex items-center justify-center p-8 order-1 md:order-2 relative group overflow-hidden border border-slate-100/50">
-                <img src={deal.imagemUrl || "https://placehold.co/800x800"} alt={deal.titulo} className="max-h-full object-contain mix-blend-multiply transition-transform duration-500 group-hover:scale-110" />
-                {temDesconto && (
-                  <div className="absolute top-6 right-6 bg-red-500 text-white font-black px-4 py-2 rounded-xl text-sm shadow-lg shadow-red-200 flex items-center gap-1">
-                    <TrendingDown size={18} /> -{porcentagemDesconto}%
-                  </div>
-                )}
-              </div>
-            </div>
 
-            <div className="bg-white rounded-[2rem] p-6 md:p-8 border border-slate-100 shadow-sm mb-8">
-              <div className="flex items-center gap-3 mb-8 border-b border-slate-100 pb-4">
-                <TrendingDown size={24} className="text-orange-500" />
-                <h2 className="text-xl font-black text-slate-800">Histórico de Preços</h2>
-              </div>
-              <div className="flex items-end justify-between gap-2 h-40 mt-6 px-2">
-                {historicoPrecos.map((item, index) => {
-                  const alturaBarra = (item.valor / maiorPrecoHistorico) * 100;
-                  return (
-                    <div key={index} className="flex flex-col items-center flex-1 group">
-                      <span className="text-[10px] md:text-xs font-bold text-slate-400 mb-2 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                        {formatarMoeda(item.valor)}
-                      </span>
-                      <div className={`w-full max-w-[3rem] rounded-t-lg transition-all duration-500 ${item.atual ? 'bg-orange-500 shadow-lg shadow-orange-200' : 'bg-slate-100 group-hover:bg-slate-200'}`} style={{ height: `${alturaBarra}%` }}></div>
-                      <span className={`text-xs font-bold mt-3 ${item.atual ? 'text-orange-500' : 'text-slate-400'}`}>{item.mes}</span>
+              <div className="flex flex-col md:flex-row gap-8 mb-8">
+                <div className="w-full md:w-1/2 bg-slate-50 rounded-[2rem] aspect-square flex items-center justify-center p-6 relative group border border-slate-100/50">
+                  <img src={deal.imagemUrl || "https://placehold.co/800x800"} alt={deal.titulo} className="max-h-full object-contain mix-blend-multiply transition-transform duration-500 group-hover:scale-110" />
+                  {temDesconto && (
+                    <div className="absolute top-4 left-4 bg-red-500 text-white font-black px-3 py-1.5 rounded-xl text-xs shadow-md shadow-red-200 flex items-center gap-1">
+                      <TrendingDown size={14} /> -{porcentagemDesconto}%
                     </div>
-                  );
-                })}
+                  )}
+                </div>
+
+                <div className="w-full md:w-1/2 flex flex-col justify-center">
+                  <h1 className="text-xl md:text-2xl font-black text-slate-900 leading-snug mb-4">
+                    {deal.titulo}
+                  </h1>
+                  
+                  <div className="mb-6">
+                    {temDesconto && (
+                      <span className="text-slate-400 line-through font-medium text-sm block mb-1">
+                        {formatarMoeda(precoAntigo)}
+                      </span>
+                    )}
+                    <div className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter">
+                      {precoFormatadoCompleto}
+                    </div>
+                  </div>
+
+                  {deal.cupom && (
+                    <CouponCopy cupom={deal.cupom} />
+                  )}
+
+                  <div className="space-y-3 mt-auto">
+                    <a href={deal.urlAfiliado || '#'} target="_blank" rel="noopener noreferrer" className="w-full bg-orange-500 text-white font-black text-lg py-4 rounded-[1.5rem] hover:bg-orange-600 transition-all shadow-xl shadow-orange-200 flex items-center justify-center gap-2 active:scale-[0.98]">
+                      <ShoppingBag size={20} /> Pegar Promoção
+                    </a>
+                    
+                    <ProductActions dealId={deal.id} dealTitulo={deal.titulo} dealPrecoFormatado={precoFormatadoCompleto} />
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* SEÇÃO DE COMENTÁRIOS VIVA! */}
-            <div id="comentarios" className="bg-white rounded-[2rem] p-6 md:p-8 border border-slate-100 shadow-sm">
-              <div className="flex items-center gap-3 mb-8 border-b border-slate-100 pb-4">
-                <MessageCircle size={24} className="text-orange-500" />
-                <h2 className="text-xl font-black text-slate-800">Comentários da Comunidade</h2>
+            {/* Bloco 2: A Mágica da Descrição do Produto aparece aqui! */}
+            {deal.descricao && (
+              <div className="bg-white rounded-[2.5rem] p-6 md:p-8 border border-slate-100 shadow-sm">
+                <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
+                  <FileText size={22} className="text-orange-500" strokeWidth={2.5} />
+                  <h2 className="text-lg font-black text-slate-800">Sobre o Produto</h2>
+                </div>
+                
+                {/* Usamos o dangerouslySetInnerHTML para renderizar o HTML da API.
+                  As classes do Tailwind abaixo estilizam as tags internas do HTML (p, ul, li, strong) 
+                  garantindo que não quebre o nosso design system.
+                */}
+                <div 
+                  className="text-slate-600 text-sm md:text-base leading-relaxed space-y-4 [&>p]:mb-4 [&>ul]:list-disc [&>ul]:ml-6 [&>ul>li]:mb-2 [&>strong]:text-slate-800"
+                  dangerouslySetInnerHTML={{ __html: deal.descricao }}
+                />
               </div>
-              
-              <CommentBox dealId={deal.id} />
-              
-            </div>
-
+            )}
           </div>
 
-          <aside className="w-full lg:w-96 flex-shrink-0">
-            <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-xl shadow-slate-200/50 sticky top-28">
-              <div className="flex items-center justify-between mb-4">
-                <span className="bg-orange-100 text-orange-600 font-black text-xs uppercase tracking-widest px-3 py-1.5 rounded-lg">{deal.loja || "Loja Parceira"}</span>
-                <div className="flex items-center gap-1 text-slate-400">
-                  <Star size={16} className="fill-amber-400 text-amber-400" />
-                  <span className="text-sm font-bold text-slate-700">4.9</span>
-                </div>
-              </div>
-              <h1 className="text-2xl md:text-3xl font-black text-slate-900 leading-tight mb-6">{deal.titulo}</h1>
-              <div className="bg-slate-50 rounded-2xl p-6 mb-6 border border-slate-100">
-                {temDesconto && (
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-slate-400 line-through font-medium">{formatarMoeda(precoAntigo)}</span>
-                    <span className="text-xs font-bold text-green-600 bg-green-100 px-2 py-1 rounded-md">Economia de {formatarMoeda(valorEconomia)}</span>
-                  </div>
-                )}
-                <div className="text-5xl font-black text-slate-900 tracking-tighter">{formatarMoeda(preco)}</div>
-                <p className="text-sm text-slate-500 font-medium mt-2">Vendido e entregue por <strong className="text-slate-700">{deal.loja || "Loja Oficial"}</strong></p>
-              </div>
+          <div className="lg:col-span-5 bg-white rounded-[2.5rem] p-6 md:p-8 border border-slate-100 shadow-sm flex flex-col h-[600px] lg:h-auto overflow-hidden">
+            <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4 flex-shrink-0">
+              <MessageCircle size={22} className="text-orange-500" strokeWidth={2.5} />
+              <h2 className="text-lg font-black text-slate-800">Interaja com a Comunidade</h2>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+              <CommentBox dealId={deal.id} />
+            </div>
+          </div>
 
-              <div className="space-y-3 mb-6">
-                <a href={deal.urlAfiliado || '#'} target="_blank" rel="noopener noreferrer" className="w-full bg-orange-500 text-white font-black text-lg py-5 rounded-[1.5rem] hover:bg-orange-600 transition-all shadow-xl shadow-orange-200 flex items-center justify-center gap-3 active:scale-[0.98]">
-                  <ShoppingBag size={24} /> Pegar Pechincha
-                </a>
-                <div className="flex gap-3">
-                  <button className="flex-1 bg-white border-2 border-slate-100 text-slate-600 font-bold py-4 rounded-[1.5rem] hover:border-red-200 hover:text-red-500 hover:bg-red-50 transition-all flex items-center justify-center gap-2">
-                    <Heart size={20} /> Salvar
-                  </button>
-                  <button className="flex-1 bg-white border-2 border-slate-100 text-slate-600 font-bold py-4 rounded-[1.5rem] hover:border-blue-200 hover:text-blue-500 hover:bg-blue-50 transition-all flex items-center justify-center gap-2">
-                    <Share2 size={20} /> Compartilhar
-                  </button>
-                </div>
-              </div>
+        </div>
 
-              <div className="flex items-start gap-3 p-4 bg-green-50/50 rounded-2xl border border-green-100 text-green-700">
-                <ShieldCheck size={24} className="flex-shrink-0 mt-0.5" />
-                <p className="text-sm font-medium"><strong>Compra Segura:</strong> O Baratinho verifica todos os links.</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+          
+          <div className="bg-white rounded-[2.5rem] p-6 md:p-8 border border-slate-100 shadow-sm">
+            <div className="flex items-center justify-between mb-8 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <TrendingDown size={22} className="text-orange-500" />
+                <h2 className="text-lg font-black text-slate-800">Menor preço dos últimos 90 dias!</h2>
               </div>
             </div>
-          </aside>
+            
+            <div className="flex items-end justify-between gap-2 h-32 mt-6 px-2">
+              {historicoPrecos.map((item, index) => {
+                const alturaBarra = (item.valor / maiorPrecoHistorico) * 100;
+                return (
+                  <div key={index} className="flex flex-col items-center flex-1 group">
+                    <span className="text-[10px] md:text-xs font-bold text-slate-400 mb-2 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                      {formatarMoeda(item.valor)}
+                    </span>
+                    <div className={`w-full max-w-[2.5rem] rounded-t-lg transition-all duration-500 ${item.atual ? 'bg-gradient-to-t from-orange-400 to-orange-500 shadow-lg shadow-orange-200' : 'bg-slate-100 group-hover:bg-slate-200'}`} style={{ height: `${alturaBarra}%` }}></div>
+                    <span className={`text-[10px] md:text-xs font-bold mt-2 ${item.atual ? 'text-orange-500' : 'text-slate-400'}`}>{item.mes}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-[2.5rem] p-6 md:p-8 border border-slate-100 shadow-sm">
+            <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
+              <Info size={22} className="text-orange-500" />
+              <h2 className="text-lg font-black text-slate-800">Detalhes da Oferta</h2>
+            </div>
+
+            <ul className="space-y-4">
+              <li className="flex items-center gap-3 text-slate-600">
+                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center flex-shrink-0"><Tag size={16} className="text-slate-400" /></div>
+                <span className="text-sm font-medium">Cupom aplicável na finalização da compra.</span>
+              </li>
+              <li className="flex items-center gap-3 text-slate-600">
+                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center flex-shrink-0"><Truck size={16} className="text-slate-400" /></div>
+                <span className="text-sm font-medium">Verifique o frete para a sua região. Pode haver frete grátis.</span>
+              </li>
+              <li className="flex items-center gap-3 text-slate-600">
+                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center flex-shrink-0"><ShieldCheck size={16} className="text-slate-400" /></div>
+                <span className="text-sm font-medium">Promoção Verificada pela nossa equipe. Loja 100% segura.</span>
+              </li>
+            </ul>
+          </div>
         </div>
+
+        {produtosRelacionados.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-6">
+              <h2 className="text-2xl font-black text-slate-800">Você também pode gostar</h2>
+              <span className="text-2xl font-black text-orange-500">...</span>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {produtosRelacionados.map((relacionado) => (
+                <DealCard key={relacionado.id} deal={relacionado} />
+              ))}
+            </div>
+          </div>
+        )}
+
       </main>
     </div>
   );

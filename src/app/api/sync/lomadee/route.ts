@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 
-// Função para URL amigável (SEO)
 const generateSlug = (text: string) => {
   return text
     .toString()
@@ -16,22 +15,19 @@ const generateSlug = (text: string) => {
 
 export async function GET(request: Request) {
   try {
-    // Agora só precisamos do Token, que atuará como x-api-key
     const LOMADEE_TOKEN = process.env.LOMADEE_TOKEN;
     
     if (!LOMADEE_TOKEN) {
       return NextResponse.json({ error: "Falta o LOMADEE_TOKEN no .env.local" }, { status: 500 });
     }
 
-    // A URL oficial da documentação com busca por 'smartphone' e limite de 20 produtos
-    const API_URL = "https://api-beta.lomadee.com.br/affiliate/products?limit=20";
+    const API_URL = "https://api-beta.lomadee.com.br/affiliate/products?limit=20&search=smartphone";
     
-    // Conexão com a nova API
     const response = await fetch(API_URL, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'x-api-key': LOMADEE_TOKEN // Cabeçalho exato exigido pela documentação
+        'x-api-key': LOMADEE_TOKEN
       },
       signal: AbortSignal.timeout(10000)
     });
@@ -41,8 +37,6 @@ export async function GET(request: Request) {
     }
 
     const jsonResponse = await response.json();
-    
-    // A documentação mostra que os produtos vêm dentro de um array chamado "data"
     const productsList = jsonResponse.data || []; 
 
     if (productsList.length === 0) {
@@ -52,7 +46,6 @@ export async function GET(request: Request) {
     let importedCount = 0;
 
     for (const product of productsList) {
-      // Usa o _id ou id oficial do produto
       const productId = String(product._id || product.id);
 
       const querySnapshot = await adminDb.collection("ofertas")
@@ -63,17 +56,15 @@ export async function GET(request: Request) {
       if (querySnapshot.empty) {
         const slug = generateSlug(product.name);
         
-        // Mapeamento Cirúrgico da Nova API
         const primeiraImagem = product.images?.[0]?.url || "";
-        const primeiraOpcao = product.options?.[0]; // Pega a primeira variante de preço/loja
+        const primeiraOpcao = product.options?.[0];
         const lojaNome = primeiraOpcao?.seller || "Loja Parceira";
-        
-        // Extrai o preço real (pode vir como listPrice ou price)
         const precoReal = primeiraOpcao?.pricing?.[0]?.price || 0;
         const precoAntigo = primeiraOpcao?.pricing?.[0]?.listPrice || (precoReal * 1.2);
 
         await adminDb.collection("ofertas").add({
           titulo: product.name,
+          descricao: product.description || "", // AQUI ESTÁ A MÁGICA DA DESCRIÇÃO!
           preco: precoReal,
           precoAntigo: precoAntigo,
           loja: lojaNome,
@@ -81,9 +72,9 @@ export async function GET(request: Request) {
           urlAfiliado: product.url,
           externalId: productId,
           slug: slug,
-          categoria: "Smartphones", // Como filtramos por 'smartphone' na URL
+          categoria: "Ofertas",
           dataCriacao: new Date(),
-          hot: true // Marca como oferta quente
+          hot: true 
         });
         importedCount++;
       }
