@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ShoppingBag, Heart, MessageCircle, X } from 'lucide-react';
+import { ShoppingBag, Heart, MessageCircle, X, UserCircle } from 'lucide-react';
 // IMPORTAÇÃO DA AUTENTICAÇÃO
 import { useAuth } from '@/contexts/AuthContext'; 
 

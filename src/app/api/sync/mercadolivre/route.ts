@@ -1,42 +1,109 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebase-admin';
 
-export async function GET() {
+const generateSlug = (text: string) => {
+  return text
+    .toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]+/g, '')
+    .replace(/--+/g, '-');
+};
+
+export async function GET(request: Request) {
   try {
-    // 1. Buscar produtos em oferta no Mercado Livre
-    // MLB = Brasil | q = termo de busca
-    const response = await fetch('https://api.mercadolibre.com/sites/MLB/search?q=oferta-do-dia&limit=10');
+    // Experimente trocar a busca para itens do seu nicho, como 'monitor gamer', 'hardware' ou 'rtx' ;)
+    const termoBusca = 'smartphone';
+    const mlApiUrl = `https://api.mercadolibre.com/sites/MLB/search?q=${termoBusca}&limit=10`;
+
+    // O DISFARCE: O cabeçalho 'User-Agent' simula um navegador real para evitar bloqueios
+    const response = await fetch(mlApiUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Accept': 'application/json'
+      }
+    });
+    
     const data = await response.json();
 
-    const results = data.results;
-    let count = 0;
+    // Tratamento de erro cirúrgico: se falhar, joga a resposta real do ML na tela
+    if (!data.results || data.results.length === 0) {
+      return NextResponse.json({ 
+        message: "Acesso negado ou sem produtos no Mercado Livre.",
+        respostaOriginalML: data 
+      }, { status: 400 });
+    }
 
-    for (const item of results) {
-      // 2. Evitar duplicados (checa se o ID do ML já existe)
-      const q = query(collection(db, "ofertas"), where("externalId", "==", item.id));
-      const querySnapshot = await getDocs(q);
+    let importedCount = 0;
+
+    for (const item of data.results) {
+      const productId = item.id;
+
+      const querySnapshot = await adminDb.collection("ofertas")
+        .where("externalId", "==", productId)
+        .limit(1)
+        .get();
 
       if (querySnapshot.empty) {
-        // 3. Salvar no Firebase com o seu link de afiliado
-        // DICA: Você deve trocar o item.permalink pelo seu link gerado no portal de afiliados
-        await addDoc(collection(db, "ofertas"), {
+        const highResImage = item.thumbnail.replace('-I.jpg', '-O.jpg');
+
+        let descricaoHtml = `<p>Produto oficial vendido no Mercado Livre.</p>`;
+        try {
+          // Disfarce aplicado também na busca da descrição detalhada
+          const descResponse = await fetch(`https://api.mercadolibre.com/items/${productId}/description`, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Accept': 'application/json'
+            }
+          });
+          
+          if (descResponse.ok) {
+            const descData = await descResponse.json();
+            if (descData.plain_text) {
+              descricaoHtml = `<p>${descData.plain_text.replace(/\n/g, '<br><br>')}</p>`;
+            }
+          }
+        } catch (e) {
+          console.log(`Sem descrição detalhada para ${productId}`);
+        }
+
+        const urlAfiliado = item.permalink;
+        const precoAtual = item.price;
+        const precoAntigo = item.original_price || (precoAtual * 1.15);
+
+        await adminDb.collection("ofertas").add({
           titulo: item.title,
-          preco: item.price,
-          precoAntigo: item.original_price || item.price * 1.2, // Simulação caso não venha
+          descricao: descricaoHtml,
+          preco: precoAtual,
+          precoAntigo: precoAntigo,
           loja: "Mercado Livre",
-          imagemUrl: item.thumbnail.replace("-I.jpg", "-O.jpg"), // Melhora a qualidade da imagem
-          urlAfiliado: item.permalink, // Link original
-          externalId: item.id,
-          dataCriacao: serverTimestamp(),
-          categoria: "Eletrônicos"
+          imagemUrl: highResImage,
+          urlAfiliado: urlAfiliado,
+          externalId: productId,
+          slug: generateSlug(item.title),
+          categoria: "Smartphones",
+          cupom: null,
+          dataCriacao: new Date(),
+          hot: true 
         });
-        count++;
+
+        importedCount++;
       }
     }
 
-    return NextResponse.json({ success: true, imported: count });
-  } catch (error) {
-    return NextResponse.json({ error: "Falha na sincronização" }, { status: 500 });
+    return NextResponse.json({ 
+      status: '✅ MERCADO LIVRE: Sincronização REAL concluída com sucesso!', 
+      novosProdutos: importedCount 
+    });
+
+  } catch (error: any) {
+    console.error("🔥 ERRO NA API DO MERCADO LIVRE:", error);
+    return NextResponse.json({ 
+      error: "Falha na sincronização", 
+      detalhe: error.message || String(error) 
+    }, { status: 500 });
   }
 }

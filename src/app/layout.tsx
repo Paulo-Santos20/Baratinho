@@ -9,6 +9,11 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Baratinho | Melhores Ofertas",
   description: "As melhores pechinchas e cupões da internet.",
+  // Verificações para os motores de busca e redes de afiliados
+  other: {
+    "lomadee": "2324685",
+    "admitad-verification": "21ed3cb656",
+  },
 };
 
 export default function RootLayout({
@@ -17,12 +22,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-PT">
+    <html lang="pt-BR">
       <head>
+        {/* Verificação Lomadee (Mantida) */}
         <meta name="lomadee" content="2324685" />
+        
+        {/* Verificação Admitad (Nova) */}
+        <meta name="admitad-verification" content="21ed3cb656" />
       </head>
       <body className={inter.className}>
-        {/* Envolvemos o children com o AuthProvider */}
+        {/* Envolvemos o children com o AuthProvider para gerenciar login/sessão */}
         <AuthProvider>
           {children}
         </AuthProvider>
