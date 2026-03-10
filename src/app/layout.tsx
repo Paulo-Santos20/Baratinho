@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   // Verificações para os motores de busca e redes de afiliados
   other: {
     "lomadee": "2324685",
-    "admitad-verification": "21ed3cb656",
+    "verify-admitad": "21ed3cb656", // NOME EXATO EXIGIDO PELO ROBÔ
   },
 };
 
@@ -27,8 +27,8 @@ export default function RootLayout({
         {/* Verificação Lomadee (Mantida) */}
         <meta name="lomadee" content="2324685" />
         
-        {/* Verificação Admitad (Nova) */}
-        <meta name="admitad-verification" content="21ed3cb656" />
+        {/* Verificação Admitad (Corrigida) */}
+        <meta name="verify-admitad" content="21ed3cb656" />
       </head>
       <body className={inter.className}>
         {/* Envolvemos o children com o AuthProvider para gerenciar login/sessão */}
