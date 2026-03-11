@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 
-// AS TRÊS LINHAS MÁGICAS QUE DESLIGAM O CACHE DA VERCEL E DO NEXT.JS
+// TRAVAS ANTI-CACHE (Performance Total)
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
+// Dá mais tempo para o servidor fazer as buscas múltiplas
+export const maxDuration = 60; 
 
 const generateSlug = (text: string) => {
   return text
@@ -26,68 +28,50 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Falta o LOMADEE_TOKEN no .env.local" }, { status: 500 });
     }
 
-    // LISTA EXPANDIDA COM OS PRODUTOS DE MAIOR CONVERSÃO NO BRASIL
     const categorias = [
-      "tv", 
-      "notebook", 
-      "geladeira", 
-      "iphone", 
-      "monitor", 
-      "ar condicionado",
-      "air fryer",
-      "playstation",
-      "xbox",
-      "nintendo switch",
-      "smartphone",
-      "fone bluetooth",
-      "caixa de som jbl",
-      "micro-ondas",
-      "maquina de lavar",
-      "aspirador robo",
-      "cafeteira",
-      "ventilador",
-      "whey protein",
-      "fralda",
-      "pneu",
-      "kindle",
-      "tablet",
-      "smartwatch",
-      "pc gamer"
+      "tv", "notebook", "geladeira", "iphone", "monitor", "ar condicionado",
+      "air fryer", "playstation", "xbox", "smartphone", "fone bluetooth",
+      "caixa de som jbl", "micro-ondas", "maquina de lavar", "cafeteira",
+      "ventilador", "whey protein", "fralda", "pneu", "tablet", "smartwatch"
     ];
 
-    // Sorteia uma categoria da lista
-    const categoriaSorteada = categorias[Math.floor(Math.random() * categorias.length)];
-    const buscaFormatada = encodeURIComponent(categoriaSorteada);
-    
-    // Formata o nome para o banco de dados (Ex: "air fryer" vira "Air fryer")
-    const categoriaParaBanco = categoriaSorteada.charAt(0).toUpperCase() + categoriaSorteada.slice(1);
+    // MÁGICA: Embaralha a lista e pega 3 categorias totalmente aleatórias
+    const categoriasEmbaralhadas = categorias.sort(() => 0.5 - Math.random());
+    const categoriasEscolhidas = categoriasEmbaralhadas.slice(0, 3);
 
-    const API_URL = `https://api-beta.lomadee.com.br/affiliate/products?limit=20&search=${buscaFormatada}`;
-    
-    const response = await fetch(API_URL, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'x-api-key': LOMADEE_TOKEN
-      },
-      cache: 'no-store', // <--- AQUI ESTÁ A GARANTIA DE DADOS FRESCOS
-      signal: AbortSignal.timeout(10000)
+    // Dispara as 3 buscas ao MESMO TEMPO (Processamento Paralelo)
+    const fetchPromises = categoriasEscolhidas.map(async (categoria) => {
+      const buscaFormatada = encodeURIComponent(categoria);
+      // Pega os 6 produtos mais relevantes (e novos) de cada categoria
+      const url = `https://api-beta.lomadee.com.br/affiliate/products?limit=6&search=${buscaFormatada}`;
+      
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json', 'x-api-key': LOMADEE_TOKEN },
+        cache: 'no-store',
+      });
+
+      if (!res.ok) return [];
+      const json = await res.json();
+      
+      // Anexa o nome da categoria que encontrou o produto para salvarmos no banco
+      return (json.data || []).map((prod: any) => ({ 
+        ...prod, 
+        categoriaSorteada: categoria.charAt(0).toUpperCase() + categoria.slice(1) 
+      }));
     });
 
-    if (!response.ok) {
-      throw new Error(`A API recusou a conexão. Código HTTP: ${response.status}`);
-    }
+    // Aguarda todas as buscas terminarem e junta tudo numa lista só
+    const resultados = await Promise.all(fetchPromises);
+    const todosProdutos = resultados.flat();
 
-    const jsonResponse = await response.json();
-    const productsList = jsonResponse.data || []; 
-
-    if (productsList.length === 0) {
-      return NextResponse.json({ message: `Sincronização OK, mas nenhum produto retornado para: ${categoriaSorteada}` });
+    if (todosProdutos.length === 0) {
+      return NextResponse.json({ message: "Nenhum produto encontrado nas categorias sorteadas." });
     }
 
     let importedCount = 0;
 
-    for (const product of productsList) {
+    for (const product of todosProdutos) {
       const productId = String(product._id || product.id);
 
       const querySnapshot = await adminDb.collection("ofertas")
@@ -106,7 +90,7 @@ export async function GET(request: Request) {
 
         await adminDb.collection("ofertas").add({
           titulo: product.name,
-          descricao: product.description || "", // AQUI ESTÁ A MÁGICA DA DESCRIÇÃO!
+          descricao: product.description || "",
           preco: precoReal,
           precoAntigo: precoAntigo,
           loja: lojaNome,
@@ -114,7 +98,7 @@ export async function GET(request: Request) {
           urlAfiliado: product.url,
           externalId: productId,
           slug: slug,
-          categoria: categoriaParaBanco, // Agora a categoria entra dinâmica!
+          categoria: product.categoriaSorteada, // Salva a categoria correta
           dataCriacao: new Date(),
           hot: true 
         });
@@ -123,15 +107,12 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({ 
-      status: `✅ DADOS REAIS: Sincronização da categoria '${categoriaSorteada}' concluída!`, 
+      status: `✅ MISTURA PERFEITA: Buscou ${categoriasEscolhidas.join(', ')}!`, 
       novosProdutos: importedCount 
     });
 
   } catch (error: any) {
-    console.error("🔥 ERRO NA NOVA API:", error);
-    return NextResponse.json({ 
-      error: "Falha na automação real", 
-      detalhe: error.message || String(error) 
-    }, { status: 500 });
+    console.error("🔥 ERRO NA API:", error);
+    return NextResponse.json({ error: "Falha na sincronização", detalhe: error.message }, { status: 500 });
   }
 }
