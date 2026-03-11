@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 
+// AS TRÊS LINHAS MÁGICAS QUE DESLIGAM O CACHE DA VERCEL E DO NEXT.JS
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
 const generateSlug = (text: string) => {
   return text
     .toString()
@@ -21,7 +26,43 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Falta o LOMADEE_TOKEN no .env.local" }, { status: 500 });
     }
 
-    const API_URL = "https://api-beta.lomadee.com.br/affiliate/products?limit=20&search=smartphone";
+    // LISTA EXPANDIDA COM OS PRODUTOS DE MAIOR CONVERSÃO NO BRASIL
+    const categorias = [
+      "tv", 
+      "notebook", 
+      "geladeira", 
+      "iphone", 
+      "monitor", 
+      "ar condicionado",
+      "air fryer",
+      "playstation",
+      "xbox",
+      "nintendo switch",
+      "smartphone",
+      "fone bluetooth",
+      "caixa de som jbl",
+      "micro-ondas",
+      "maquina de lavar",
+      "aspirador robo",
+      "cafeteira",
+      "ventilador",
+      "whey protein",
+      "fralda",
+      "pneu",
+      "kindle",
+      "tablet",
+      "smartwatch",
+      "pc gamer"
+    ];
+
+    // Sorteia uma categoria da lista
+    const categoriaSorteada = categorias[Math.floor(Math.random() * categorias.length)];
+    const buscaFormatada = encodeURIComponent(categoriaSorteada);
+    
+    // Formata o nome para o banco de dados (Ex: "air fryer" vira "Air fryer")
+    const categoriaParaBanco = categoriaSorteada.charAt(0).toUpperCase() + categoriaSorteada.slice(1);
+
+    const API_URL = `https://api-beta.lomadee.com.br/affiliate/products?limit=20&search=${buscaFormatada}`;
     
     const response = await fetch(API_URL, {
       method: 'GET',
@@ -29,6 +70,7 @@ export async function GET(request: Request) {
         'Accept': 'application/json',
         'x-api-key': LOMADEE_TOKEN
       },
+      cache: 'no-store', // <--- AQUI ESTÁ A GARANTIA DE DADOS FRESCOS
       signal: AbortSignal.timeout(10000)
     });
 
@@ -40,7 +82,7 @@ export async function GET(request: Request) {
     const productsList = jsonResponse.data || []; 
 
     if (productsList.length === 0) {
-      return NextResponse.json({ message: "Sincronização OK, mas nenhum produto retornado." });
+      return NextResponse.json({ message: `Sincronização OK, mas nenhum produto retornado para: ${categoriaSorteada}` });
     }
 
     let importedCount = 0;
@@ -72,7 +114,7 @@ export async function GET(request: Request) {
           urlAfiliado: product.url,
           externalId: productId,
           slug: slug,
-          categoria: "Ofertas",
+          categoria: categoriaParaBanco, // Agora a categoria entra dinâmica!
           dataCriacao: new Date(),
           hot: true 
         });
@@ -81,7 +123,7 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({ 
-      status: '✅ DADOS REAIS: Sincronização Beta da Lomadee concluída!', 
+      status: `✅ DADOS REAIS: Sincronização da categoria '${categoriaSorteada}' concluída!`, 
       novosProdutos: importedCount 
     });
 

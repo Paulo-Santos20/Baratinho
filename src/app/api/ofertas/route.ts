@@ -1,20 +1,30 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 
-const generateSlug = (text: string) => {
-  return text.toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]+/g, '').replace(/--+/g, '-');
-};
+// FUNÇÃO GET: Busca todas as ofertas para a tabela do Admin
+export async function GET() {
+  try {
+    const snapshot = await adminDb.collection('ofertas').orderBy('dataCriacao', 'desc').get();
+    const ofertas = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    return NextResponse.json(ofertas);
+  } catch (error) {
+    console.error("Erro ao buscar ofertas:", error);
+    return NextResponse.json({ error: 'Erro ao carregar os dados.' }, { status: 500 });
+  }
+}
 
+// FUNÇÃO POST: Salva novas ofertas manuais (Mantida intacta)
 export async function POST(request: Request) {
   try {
     const data = await request.json();
-
-    // Validação básica de segurança
     if (!data.titulo || !data.preco || !data.urlAfiliado) {
       return NextResponse.json({ error: 'Campos obrigatórios faltando.' }, { status: 400 });
     }
 
-    const slug = generateSlug(data.titulo) + '-' + Math.floor(Math.random() * 10000);
+    const slug = data.titulo.toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]+/g, '').replace(/--+/g, '-') + '-' + Math.floor(Math.random() * 10000);
 
     const novaOferta = {
       titulo: data.titulo,
@@ -34,10 +44,23 @@ export async function POST(request: Request) {
     };
 
     const docRef = await adminDb.collection('ofertas').add(novaOferta);
-
     return NextResponse.json({ success: true, id: docRef.id, slug });
-  } catch (error: any) {
-    console.error("Erro ao salvar oferta manual:", error);
-    return NextResponse.json({ error: 'Erro ao salvar a oferta no banco de dados.' }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json({ error: 'Erro ao salvar.' }, { status: 500 });
+  }
+}
+
+// FUNÇÃO DELETE: Apaga a oferta do banco de dados
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) return NextResponse.json({ error: 'ID não fornecido.' }, { status: 400 });
+
+    await adminDb.collection('ofertas').doc(id).delete();
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: 'Erro ao deletar.' }, { status: 500 });
   }
 }
