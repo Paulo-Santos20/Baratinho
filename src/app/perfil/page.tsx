@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, query, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, where } from 'firebase/firestore';
 import Navbar from '@/components/Navbar';
 import DealCard from '@/components/DealCard';
 import { Heart, Bell, Settings, LogOut, Loader2, HeartCrack, ChevronRight } from 'lucide-react';
@@ -24,16 +24,22 @@ export default function PerfilPage() {
     }
   }, [user, loading, router]);
 
-  // Busca as ofertas salvas (Por enquanto, busca tudo e filtra no cliente simulando o salvamento)
+  // Busca EXATAMENTE as ofertas onde o ID do usuário está dentro do array "likes"
   useEffect(() => {
     const fetchSavedDeals = async () => {
       if (!user) return;
       setIsLoadingDeals(true);
       try {
-        const q = query(collection(db, "ofertas"), orderBy("dataCriacao", "desc"));
+        // PERFORMANCE TOTAL: O Firebase já filtra lá no servidor, economizando sua banda!
+        const q = query(
+          collection(db, "ofertas"), 
+          where("likes", "array-contains", user.uid),
+          orderBy("dataCriacao", "desc")
+        );
+        
         const snapshot = await getDocs(q);
         
-        const dealsArray = snapshot.docs.map(doc => {
+        const favoritosDoUsuario = snapshot.docs.map(doc => {
           const data = doc.data();
           return { 
             id: doc.id, 
@@ -42,9 +48,6 @@ export default function PerfilPage() {
           };
         });
 
-        // FUTURO: Aqui filtraremos onde deal.likes.includes(user.uid)
-        // Por enquanto, deixamos um mock ou array vazio para ver o Empty State
-        const favoritosDoUsuario = dealsArray.filter(deal => deal.likes && deal.likes.includes(user.uid));
         setSavedDeals(favoritosDoUsuario);
       } catch (error) {
         console.error("Erro ao buscar salvos:", error);
