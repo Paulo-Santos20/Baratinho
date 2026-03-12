@@ -1,11 +1,9 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 
-// TRAVAS ANTI-CACHE (Performance Total)
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
-// Dá mais tempo para o servidor fazer as buscas múltiplas
 export const maxDuration = 60; 
 
 const generateSlug = (text: string) => {
@@ -35,13 +33,11 @@ export async function GET(request: Request) {
       "ventilador", "whey protein", "fralda", "pneu", "tablet", "smartwatch"
     ];
 
-    // MÁGICA: Embaralha a lista e pega 3 categorias totalmente aleatórias
     const categoriasEmbaralhadas = categorias.sort(() => 0.5 - Math.random());
     const categoriasEscolhidas = categoriasEmbaralhadas.slice(0, 3);
 
     console.log(`🚀 Iniciando busca para: ${categoriasEscolhidas.join(', ')}`);
 
-    // Dispara as 3 buscas ao MESMO TEMPO (Processamento Paralelo)
     const fetchPromises = categoriasEscolhidas.map(async (categoria) => {
       try {
         const buscaFormatada = encodeURIComponent(categoria);
@@ -53,24 +49,11 @@ export async function GET(request: Request) {
           cache: 'no-store',
         });
 
-        if (!res.ok) {
-          console.error(`❌ Erro na API para "${categoria}": Status ${res.status}`);
-          return [];
-        }
-        
+        if (!res.ok) return [];
         const json = await res.json();
         
-        // ==========================================
-        // 🚨 MODO RAIO-X LIGADO
-        // ==========================================
-        console.log(`\n=== RAIO-X LOMADEE: ${categoria} ===`);
-        // Imprime apenas os primeiros 300 caracteres para não travar os logs, mas o suficiente para vermos a estrutura
-        console.log(JSON.stringify(json).substring(0, 300) + '...'); 
-        
-        // CAÇADOR INTELIGENTE: Procura onde está a array de produtos independente do nome que a API der
         const arrayDeProdutos = json.data || json.products || json.items || (Array.isArray(json) ? json : []);
 
-        // Anexa o nome da categoria que encontrou o produto para salvarmos no banco
         return arrayDeProdutos.map((prod: any) => ({ 
           ...prod, 
           categoriaSorteada: categoria.charAt(0).toUpperCase() + categoria.slice(1) 
@@ -78,26 +61,29 @@ export async function GET(request: Request) {
 
       } catch (err) {
         console.error(`❌ Falha ao processar categoria "${categoria}":`, err);
-        return []; // Retorna vazio mas não quebra as outras categorias
+        return [];
       }
     });
 
-    // Aguarda todas as buscas terminarem e junta tudo numa lista só
     const resultados = await Promise.all(fetchPromises);
     const todosProdutos = resultados.flat();
 
     if (todosProdutos.length === 0) {
-      console.log("⚠️ Nenhum produto retornado pela Lomadee.");
-      return NextResponse.json({ message: "A API da Lomadee não retornou produtos válidos agora.", raioX: "Verifique os logs da Vercel" });
+      return NextResponse.json({ message: "Nenhum produto retornado pela API neste momento." });
     }
 
     let importedCount = 0;
+    let ignoredCount = 0;
 
     for (const product of todosProdutos) {
-      // Garante que pega o ID não importa como a Lomadee mande
+      // 1. Pula produtos que a loja avisou que estão sem estoque
+      if (product.available === false) {
+        ignoredCount++;
+        continue; 
+      }
+
       const productId = String(product._id || product.id || product.productId);
-      
-      if (!productId || productId === 'undefined') continue; // Pula se vier lixo da API
+      if (!productId || productId === 'undefined') continue;
 
       const querySnapshot = await adminDb.collection("ofertas")
         .where("externalId", "==", productId)
@@ -105,18 +91,20 @@ export async function GET(request: Request) {
         .get();
 
       if (querySnapshot.empty) {
-        // Fallbacks seguros para caso a estrutura mude
         const nomeProduto = product.name || product.title || "Produto sem nome";
         const slug = generateSlug(nomeProduto);
         
-        const primeiraImagem = product.images?.[0]?.url || product.thumbnail || product.image || "";
-        const primeiraOpcao = product.options?.[0];
-        const lojaNome = primeiraOpcao?.seller || product.store?.name || "Loja Parceira";
-        const precoReal = primeiraOpcao?.pricing?.[0]?.price || product.price || 0;
-        const precoAntigo = primeiraOpcao?.pricing?.[0]?.listPrice || product.originalPrice || (precoReal > 0 ? precoReal * 1.2 : 0);
-        const linkAfiliado = product.url || product.link || "";
+        // EXTRATORES BLINDADOS: Vasculha todos os possíveis nomes de campos da Lomadee
+        const primeiraImagem = product.thumbnail || product.image || product.images?.[0]?.url || product.images?.[0] || "";
+        const linkAfiliado = product.link || product.url || product.affiliateUrl || "";
+        const lojaNome = product.store?.name || product.seller || product.options?.[0]?.seller || "Loja Parceira";
+        
+        // Força a conversão do preço para Número
+        const precoReal = Number(product.price || product.salePrice || product.priceMin || product.options?.[0]?.pricing?.[0]?.price || 0);
+        const precoAntigo = Number(product.originalPrice || product.listPrice || product.options?.[0]?.pricing?.[0]?.listPrice || (precoReal > 0 ? precoReal * 1.2 : 0));
 
-        if (precoReal > 0) {
+        // 2. Trava de Segurança: Só salva se tiver Preço e Link de afiliado
+        if (precoReal > 0 && linkAfiliado !== "") {
           await adminDb.collection("ofertas").add({
             titulo: nomeProduto,
             descricao: product.description || "",
@@ -124,23 +112,28 @@ export async function GET(request: Request) {
             precoAntigo: precoAntigo,
             loja: lojaNome,
             imagemUrl: primeiraImagem,
-            urlAfiliado: linkAfiliado, // Aqui entra o seu link monetizado
+            urlAfiliado: linkAfiliado, 
             externalId: productId,
             slug: slug,
             categoria: product.categoriaSorteada,
             dataCriacao: new Date(),
             hot: true,
-            likes: [], // Inicia a array de likes vazia para evitar erro na página de perfil
+            likes: [], 
             comentarios: 0
           });
           importedCount++;
+        } else {
+          // Se falhar, avisa no log O QUE faltou (Preço ou Link)
+          console.log(`⚠️ Ignorado [Faltou Preço ou Link]: ${nomeProduto} | Preço lido: ${precoReal} | Link lido: ${linkAfiliado ? 'OK' : 'Vazio'}`);
+          ignoredCount++;
         }
       }
     }
 
     return NextResponse.json({ 
       status: `✅ MISTURA PERFEITA: Buscou ${categoriasEscolhidas.join(', ')}!`, 
-      novosProdutos: importedCount,
+      novosProdutosSalvos: importedCount,
+      produtosIgnoradosOuEsgotados: ignoredCount,
       totalProcessado: todosProdutos.length
     });
 
