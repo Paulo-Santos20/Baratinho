@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ShoppingBag, Heart, MessageCircle, X, UserCircle, Clock, Tag, ShieldCheck, TrendingDown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext'; 
+import { db } from '@/lib/firebase';
+import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 
-// ENGRENAGEM DE TEMPO (Calcula a idade da oferta)
+// ENGRENAGEM DE TEMPO
 const formatTimeAgo = (dateInput: any) => {
   if (!dateInput) return '';
   const date = dateInput._seconds ? new Date(dateInput._seconds * 1000) : new Date(dateInput);
@@ -29,8 +31,19 @@ export default function DealCard({ deal }: { deal: any }) {
   const isUserLoggedIn = !!user;
 
   const [imgError, setImgError] = useState(false);
-  const [isFavorite, setIsFavorite] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  
+  // O estado inicial de 'favoritado' depende do banco de dados
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  // Lê o banco de dados para pintar o coração se o usuário já tiver salvo antes
+  useEffect(() => {
+    if (user && deal.likes) {
+      setIsFavorite(deal.likes.includes(user.uid));
+    } else {
+      setIsFavorite(false);
+    }
+  }, [user, deal.likes]);
 
   const precoFormatado = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deal.preco || 0);
   const precoAntigoFormatado = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deal.precoAntigo || 0);
@@ -45,13 +58,37 @@ export default function DealCard({ deal }: { deal: any }) {
   const temDesconto = deal.precoAntigo > deal.preco;
   const porcentagemDesconto = temDesconto ? Math.round(((deal.precoAntigo - deal.preco) / deal.precoAntigo) * 100) : 0;
 
-  const handleFavoriteClick = (e: React.MouseEvent) => {
+  // MÁGICA DE GRAVAÇÃO NO FIREBASE
+  const handleFavoriteClick = async (e: React.MouseEvent) => {
     e.preventDefault(); 
-    if (!isUserLoggedIn) {
+    if (!isUserLoggedIn || !user) {
       setShowLoginModal(true);
       return;
     }
+
+    // Optimistic UI: Muda a tela instantaneamente para parecer super rápido
+    const estadoAnterior = isFavorite;
     setIsFavorite(!isFavorite); 
+
+    try {
+      const dealRef = doc(db, 'ofertas', deal.id);
+      
+      if (estadoAnterior) {
+        // Se já era favorito, remove a "digital" do usuário do banco
+        await updateDoc(dealRef, {
+          likes: arrayRemove(user.uid)
+        });
+      } else {
+        // Se não era favorito, adiciona a "digital" do usuário no banco
+        await updateDoc(dealRef, {
+          likes: arrayUnion(user.uid)
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao favoritar:", error);
+      // Se der erro de internet, desfaz a animação do coração para não enganar o usuário
+      setIsFavorite(estadoAnterior); 
+    }
   };
 
   const handleLoginNoModal = async () => {
@@ -63,7 +100,6 @@ export default function DealCard({ deal }: { deal: any }) {
     <>
       <div className="group bg-white rounded-[1.5rem] flex flex-col h-full overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl hover:border-orange-100 transition-all duration-300 relative">
         
-        {/* IMAGEM E SELOS */}
         <Link href={linkDestino} className="relative overflow-hidden bg-white flex items-center justify-center flex-shrink-0 aspect-square border-b border-slate-50">
           <img src={imagemFinal} alt={deal.titulo || "Oferta"} onError={() => setImgError(true)} className="max-h-full max-w-full object-contain p-4 mix-blend-multiply transition-transform duration-500 group-hover:scale-105" />
           
@@ -74,7 +110,6 @@ export default function DealCard({ deal }: { deal: any }) {
           )}
 
           <div className="absolute bottom-3 right-3 flex items-center gap-1">
-            {/* Correção do Avatar: Evitando erros se a foto do usuário não existir */}
             {deal.usuarioPostadorPhoto && (
               <img src={deal.usuarioPostadorPhoto} alt="Postador" className="w-7 h-7 rounded-full border border-slate-200 bg-white" />
             )}
@@ -84,18 +119,15 @@ export default function DealCard({ deal }: { deal: any }) {
           </div>
         </Link>
 
-        {/* INFORMAÇÕES DO PRODUTO */}
         <div className="flex flex-col flex-grow p-4">
           <Link href={linkDestino} className="block flex-grow">
             
-            {/* LOJA E TEMPO */}
             <div className="flex items-center gap-2 mb-2">
               <div className="w-5 h-5 rounded-full overflow-hidden flex-shrink-0 border border-slate-100 bg-white p-0.5">
                 <img src={deal.lojaLogoUrl || `https://logo.clearbit.com/${deal.loja?.toLowerCase().replace(/\s/g, '')}.com`} onError={(e) => e.currentTarget.style.display = 'none'} className="w-full h-full object-contain mix-blend-multiply" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1">
-                  {/* Fonte da loja bem menor e com truncate para não quebrar a linha */}
                   <span className="text-[10px] font-bold text-slate-700 truncate block leading-none">{deal.loja || "Loja Parceira"}</span>
                   {deal.lojaVerificada && <ShieldCheck size={12} className="text-emerald-500 flex-shrink-0" strokeWidth={2.5} />}
                 </div>
@@ -107,12 +139,10 @@ export default function DealCard({ deal }: { deal: any }) {
               </div>
             </div>
             
-            {/* TÍTULO DO PRODUTO (Menor para caber perfeitamente) */}
             <h3 className="text-xs sm:text-[13px] font-bold text-slate-800 leading-snug line-clamp-2 min-h-[2.25rem] group-hover:text-orange-500 transition-colors mb-2">
               {deal.titulo || "Produto sem título"}
             </h3>
 
-            {/* ÁREA DE CUPOM */}
             {deal.cupom && (
               <div className="inline-flex items-center gap-1 bg-red-50 text-red-600 px-2 py-1 rounded-md border border-red-100 font-bold uppercase text-[9px] tracking-wider mb-2">
                 <Tag size={10} strokeWidth={2.5} />
@@ -121,8 +151,6 @@ export default function DealCard({ deal }: { deal: any }) {
             )}
           </Link>
           
-          {/* ÁREA DE PREÇO E COMPRA */}
-          {/* min-w-0 é crucial aqui para evitar que o preço expulse o botão */}
           <div className="pt-3 border-t border-slate-50 flex items-end justify-between gap-1.5 min-w-0">
             <div className="min-w-0 flex-1 truncate">
               {deal.precoAntigo > deal.preco && (
@@ -147,13 +175,12 @@ export default function DealCard({ deal }: { deal: any }) {
             </a>
           </div>
 
-          {/* RODAPÉ DO CARD (Comentários e Fav) - Estilo do Print */}
           <div className="mt-3 pt-3 border-t border-slate-50 flex items-center justify-between text-slate-400 text-[10px] font-bold">
             <Link href={`${linkDestino}#comentarios`} className="flex items-center gap-1 hover:text-slate-600 transition">
               <MessageCircle size={12} strokeWidth={2.5} /> {deal.comentarios || 0} opiniões
             </Link>
             <div className="flex items-center gap-1">
-              {deal.qtdSalvos || 0} <Heart size={12} strokeWidth={2.5} />
+              {deal.likes?.length || 0} <Heart size={12} strokeWidth={2.5} />
             </div>
           </div>
 

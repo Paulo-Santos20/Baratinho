@@ -5,10 +5,10 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import Navbar from '@/components/Navbar';
 import CommentBox from '@/components/CommentBox';
-import DealCard from '@/components/DealCard'; 
+import DealCard from '@/components/DealCard';
 import CouponCopy from '@/components/CouponCopy';
 import ShareButtons from '@/components/ShareButtons';
-import PriceChart from '@/components/PriceChart'; 
+import PriceChart from '@/components/PriceChart';
 import { ChevronRight, ShoppingBag, TrendingDown, AlertCircle, MessageCircle, Star, Info, Tag, Truck, ShieldCheck, FileText, Clock } from 'lucide-react';
 
 export async function generateMetadata({
@@ -31,10 +31,10 @@ export async function generateMetadata({
 
   const deal = snapshot.docs[0].data();
   const precoFormatado = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deal.preco || 0);
-  
+
   const tituloOG = `🚨 ${precoFormatado} - ${deal.titulo}`;
-  const descricaoLimpa = deal.descricao 
-    ? deal.descricao.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').substring(0, 160) + '...' 
+  const descricaoLimpa = deal.descricao
+    ? deal.descricao.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').substring(0, 160) + '...'
     : `Confira essa super oferta no Baratinho por apenas ${precoFormatado}! Corra antes que acabe.`;
 
   return {
@@ -43,7 +43,7 @@ export async function generateMetadata({
     openGraph: {
       title: tituloOG,
       description: descricaoLimpa,
-      url: `https://baratinho.vercel.app/p/${slug}`, 
+      url: `https://baratinho.vercel.app/p/${slug}`,
       siteName: 'Baratinho',
       images: [
         {
@@ -122,8 +122,8 @@ export default async function ProductPage({
   const produtosRelacionados = snapRelacionados.docs
     .map(doc => {
       const data = doc.data();
-      return { 
-        id: doc.id, 
+      return {
+        id: doc.id,
         ...data,
         dataCriacao: data.dataCriacao?.toMillis ? data.dataCriacao.toMillis() : Date.now()
       };
@@ -154,7 +154,7 @@ export default async function ProductPage({
       <Navbar />
 
       <main className="container mx-auto px-4 pt-28 pb-24 md:pb-12">
-        
+
         <nav className="flex items-center gap-2 text-sm font-medium text-slate-400 mb-6 overflow-x-auto whitespace-nowrap pb-2">
           <Link href="/" className="hover:text-orange-500 transition-colors">Home</Link>
           <ChevronRight size={14} />
@@ -169,10 +169,10 @@ export default async function ProductPage({
             BLOCO SUPERIOR: PRODUTO + COMENTÁRIOS
             ========================================= */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
-          
+
           <div className="lg:col-span-7 flex flex-col gap-8">
             <div className="bg-white rounded-[2.5rem] p-6 md:p-8 border border-slate-100 shadow-sm flex flex-col">
-              
+
               <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                 <div className="flex items-center gap-3">
                   <span className="bg-orange-100 text-orange-600 font-black text-xs uppercase tracking-widest px-3 py-1.5 rounded-lg">
@@ -204,7 +204,7 @@ export default async function ProductPage({
                   <h1 className="text-xl md:text-2xl font-black text-slate-900 leading-snug mb-4">
                     {deal.titulo}
                   </h1>
-                  
+
                   <div className="mb-6">
                     {temDesconto && (
                       <span className="text-slate-400 line-through font-bold text-base md:text-lg block mb-1">
@@ -224,10 +224,15 @@ export default async function ProductPage({
                     <a href={deal.urlAfiliado || '#'} target="_blank" rel="noopener noreferrer" className="w-full bg-orange-500 text-white font-black text-lg py-4 rounded-[1.5rem] hover:bg-orange-600 transition-all shadow-xl shadow-orange-200 flex items-center justify-center gap-2 active:scale-[0.98]">
                       <ShoppingBag size={20} /> Pegar Promoção
                     </a>
-                    
+
                     {/* Botões unificados de Compartilhar/Salvar */}
-                    <ShareButtons titulo={deal.titulo} precoFormatado={precoFormatadoCompleto} urlProduto={`https://baratinho.vercel.app/p/${deal.slug}`} />
-                  </div>
+                    <ShareButtons
+                      dealId={deal.id}
+                      titulo={deal.titulo}
+                      precoFormatado={precoFormatadoCompleto}
+                      urlProduto={`https://baratinho.vercel.app/p/${deal.slug}`}
+                      initialLikes={deal.likes || []}
+                    />                  </div>
                 </div>
               </div>
             </div>
@@ -238,8 +243,8 @@ export default async function ProductPage({
                   <FileText size={22} className="text-orange-500" strokeWidth={2.5} />
                   <h2 className="text-lg font-black text-slate-800">Sobre o Produto</h2>
                 </div>
-                
-                <div 
+
+                <div
                   className="text-slate-600 text-sm md:text-base leading-relaxed space-y-4 [&>p]:mb-4 [&>ul]:list-disc [&>ul]:ml-6 [&>ul>li]:mb-2 [&>strong]:text-slate-800 break-words"
                   dangerouslySetInnerHTML={{ __html: deal.descricao }}
                 />
@@ -252,7 +257,7 @@ export default async function ProductPage({
               <MessageCircle size={22} className="text-orange-500" strokeWidth={2.5} />
               <h2 className="text-lg font-black text-slate-800">Interaja com a Comunidade</h2>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
               <CommentBox dealId={deal.id} />
             </div>
@@ -264,13 +269,13 @@ export default async function ProductPage({
             BLOCO INFERIOR: GRÁFICO + DETALHES
             ========================================= */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-          
+
           <div className="bg-white rounded-[2.5rem] p-6 md:p-8 border border-slate-100 shadow-sm flex flex-col">
             <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4 flex-shrink-0">
               <TrendingDown size={22} className="text-orange-500" />
               <h2 className="text-lg font-black text-slate-800">Histórico de Preços (90 dias)</h2>
             </div>
-            
+
             <div className="flex-1 min-h-[250px] w-full mt-4">
               <PriceChart dataGrafico={dataGrafico} />
             </div>
@@ -308,7 +313,7 @@ export default async function ProductPage({
               <h2 className="text-2xl font-black text-slate-800">Você também pode gostar</h2>
               <span className="text-2xl font-black text-orange-500">...</span>
             </div>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {produtosRelacionados.map((relacionado) => (
                 <DealCard key={relacionado.id} deal={relacionado} />

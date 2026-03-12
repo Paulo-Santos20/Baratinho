@@ -1,18 +1,41 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Share2, Check, Heart } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext'; 
+import { db } from '@/lib/firebase';
+import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 
-export default function ShareButtons({ titulo, precoFormatado, urlProduto }: { titulo: string, precoFormatado: string, urlProduto: string }) {
+export default function ShareButtons({ 
+  dealId, 
+  titulo, 
+  precoFormatado, 
+  urlProduto, 
+  initialLikes = [] 
+}: { 
+  dealId: string, 
+  titulo: string, 
+  precoFormatado: string, 
+  urlProduto: string, 
+  initialLikes?: string[] 
+}) {
   const [copiado, setCopiado] = useState(false);
-  const [salvo, setSalvo] = useState(false);
   const { user } = useAuth();
+  
+  // Verifica se o usuário atual já havia salvo a oferta
+  const [salvo, setSalvo] = useState(false);
+
+  useEffect(() => {
+    if (user && initialLikes) {
+      setSalvo(initialLikes.includes(user.uid));
+    } else {
+      setSalvo(false);
+    }
+  }, [user, initialLikes]);
   
   const link = urlProduto || (typeof window !== 'undefined' ? window.location.href : '');
   const textoCompartilhamento = `🚨 *Pechincha Encontrada!*\n\n${titulo}\n🔥 Por apenas: *${precoFormatado}*\n\nPegue aqui antes que acabe: ${link}`;
 
-  // FUNÇÃO MÁGICA: Compartilhamento Nativo (Mobile-First)
   const handleCompartilhar = async () => {
     if (navigator.share) {
       try {
@@ -24,24 +47,38 @@ export default function ShareButtons({ titulo, precoFormatado, urlProduto }: { t
         console.log('Compartilhamento cancelado pelo usuário');
       }
     } else {
-      // Se estiver no PC antigo e não tiver a gaveta de compartilhamento, copia o link direto
       navigator.clipboard.writeText(textoCompartilhamento);
       setCopiado(true);
       setTimeout(() => setCopiado(false), 2000);
     }
   };
 
-  const handleSalvar = () => {
+  // GRAVAÇÃO DO FAVORITO NO FIREBASE PELA PÁGINA DO PRODUTO
+  const handleSalvar = async () => {
     if (!user) {
       alert('Faça login para salvar esta oferta no seu perfil!');
       return;
     }
-    setSalvo(!salvo);
+
+    const estadoAnterior = salvo;
+    setSalvo(!salvo); // Optimistic UI
+
+    try {
+      const dealRef = doc(db, 'ofertas', dealId);
+      
+      if (estadoAnterior) {
+        await updateDoc(dealRef, { likes: arrayRemove(user.uid) });
+      } else {
+        await updateDoc(dealRef, { likes: arrayUnion(user.uid) });
+      }
+    } catch (error) {
+      console.error("Erro ao favoritar:", error);
+      setSalvo(estadoAnterior); // Desfaz em caso de erro
+    }
   };
 
   return (
     <div className="flex items-center gap-3 w-full mt-4">
-      {/* BOTÃO SALVAR */}
       <button 
         onClick={handleSalvar}
         className={`flex-1 font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 active:scale-95 border ${
@@ -54,7 +91,6 @@ export default function ShareButtons({ titulo, precoFormatado, urlProduto }: { t
         {salvo ? 'Salvo' : 'Salvar'}
       </button>
       
-      {/* BOTÃO COMPARTILHAR NATIVO */}
       <button 
         onClick={handleCompartilhar}
         className="flex-1 bg-slate-100 text-slate-700 font-bold py-3.5 rounded-2xl hover:bg-slate-200 transition-all flex items-center justify-center gap-2 active:scale-95"
